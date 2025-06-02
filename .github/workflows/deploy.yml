@@ -1,0 +1,54 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  create:
+    tags:
+      - 'v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v3
+
+      - name: 🔐 Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 400 key.pem
+
+      - name: 📦 Set Environment Variables
+        id: set-env
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/dev" ]]; then
+            echo "host=${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=development" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "host=${{ secrets.STG_EC2_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=staging" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "host=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=production" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🚀 Deploy to ${{ steps.set-env.outputs.env }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ steps.set-env.outputs.host }} << 'EOF'
+            cd ~/app
+            git pull origin ${{ github.ref_name }}
+
+            # Backend
+            cd backend
+            npm install
+            npm run dev
+
+            # Frontend
+            cd ../frontend
+            npm install
+            npm run build
+            sudo cp -r build/* /var/www/html/
+          EOF
