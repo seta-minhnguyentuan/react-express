@@ -44,6 +44,7 @@ jobs:
               git pull origin dev
               npm install
               npm run build
+              pkill -f "npm start"
               npm start
             EOF
 

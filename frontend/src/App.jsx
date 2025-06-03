@@ -44,7 +44,7 @@ function App() {
       const response = await axios.put(`${API_URL}/todos/${id}`, {
         completed: !completed
       });
-      setTodos(todos?.map(todo =>
+      setTodos(Array.isArray(todos) && todos?.map(todo =>
         todo.id === id ? response.data : todo
       ));
     } catch (error) {
@@ -56,7 +56,7 @@ function App() {
   const deleteTodo = async (id) => {
     try {
       await axios.delete(`${API_URL}/todos/${id}`);
-      setTodos(todos.filter(todo => todo.id !== id));
+      setTodos(Array.isArray(todos) && todos.filter(todo => todo.id !== id));
     } catch (error) {
       console.error('Error deleting todo:', error);
     }
@@ -114,9 +114,9 @@ function App() {
 
         <div className="stats">
           <p>
-            Total: {todos.length} |
-            Completed: {todos.filter(t => t.completed).length} |
-            Remaining: {todos.filter(t => !t.completed).length}
+            Total: {Array.isArray(todos) && todos.length} |
+            Completed: {Array.isArray(todos) && todos.filter(t => t.completed).length} |
+            Remaining: {Array.isArray(todos) && todos.filter(t => !t.completed).length}
           </p>
         </div>
       </div>
