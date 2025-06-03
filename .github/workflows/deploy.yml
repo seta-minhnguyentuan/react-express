@@ -44,7 +44,7 @@ jobs:
               git pull origin dev
               npm install
               npm run build
-              node server.js
+              npm start
             EOF
 
 
