@@ -44,7 +44,7 @@ function App() {
       const response = await axios.put(`${API_URL}/todos/${id}`, {
         completed: !completed
       });
-      setTodos(todos.map(todo => 
+      setTodos(todos?.map(todo => 
         todo.id === id ? response.data : todo
       ));
     } catch (error) {
@@ -89,10 +89,10 @@ function App() {
         </form>
 
         <div className="todos-list">
-          {todos.length === 0 ? (
+          {todos?.length === 0 ? (
             <p className="no-todos">No todos yet. Add one above!</p>
           ) : (
-            todos.map((todo) => (
+            todos?.map((todo) => (
               <div key={todo.id} className={`todo-item ${todo.completed ? 'completed' : ''}`}>
                 <input
                   type="checkbox"
