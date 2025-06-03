@@ -43,8 +43,16 @@ jobs:
               cd /home/ubuntu/react-express/backend
               git pull origin dev
               npm install
-              npm run build
-              pkill -f "npm start"
+              
+              # Kill existing processes more aggressively
+              pkill -f "node server.js" || true
+              pkill -f "npm start" || true
+              fuser -k 8080/tcp || true
+              
+              # Wait a moment for processes to die
+              sleep 2
+              
+              # Start the application
               npm start
             EOF
 
