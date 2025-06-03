@@ -44,16 +44,26 @@ jobs:
               git pull origin dev
               npm install
               
-              # Kill existing processes more aggressively
+              # Kill existing processes
               pkill -f "node server.js" || true
               pkill -f "npm start" || true
               fuser -k 8080/tcp || true
               
-              # Wait a moment for processes to die
+              # Wait for processes to die
               sleep 2
               
-              # Start the application
-              npm start
+              # Start in background and detach from terminal
+              nohup npm start > server.log 2>&1 &
+              
+              # Wait a moment and verify it started
+              sleep 3
+              if pgrep -f "node server.js" > /dev/null; then
+                echo "Server started successfully"
+                exit 0
+              else
+                echo "Failed to start server"
+                exit 1
+              fi
             EOF
 
 
