@@ -102,9 +102,9 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            chmod 400 "ap-ec2-prod.pem"  # Assuming different key for prod
+            chmod 400 "ap-ec2.pem"  # Assuming different key for prod
 
-            ssh -i "ap-ec2-prod.pem" ubuntu@${{ secrets.EC2_BE_PROD_PRIVATE_IP }} << 'EOF'
+            ssh -i "ap-ec2.pem" ubuntu@${{ secrets.EC2_BE_PROD_PRIVATE_IP }} << 'EOF'
               cd /home/ubuntu/react-express/backend
               git fetch --tags origin
               git checkout ${{ steps.tag.outputs.tag }}
