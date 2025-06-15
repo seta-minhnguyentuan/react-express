@@ -1,152 +1,68 @@
-name: Deploy FE & BE to Dev or Prod
+name: CI/CD Deploy to EC2 via ECR
 
 on:
   push:
     branches:
-      - dev
-    tags:
-      - 'v*'  # Trigger on version tags like v1.0.0, v2.1.3, etc.
+      - main
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_FE_REPO: your-ecr-id.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/frontend
+  ECR_BE_REPO: your-ecr-id.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/backend
 
 jobs:
-  deploy-dev:
-    if: github.ref == 'refs/heads/dev'
+  build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Deploy FE to Dev
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_FE_DEV_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            cd /home/ubuntu/react-express/frontend
-            git pull origin dev
-            npm install
-            npm run build
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
 
-            sudo rm -rf /var/www/html/*
-            sudo cp -r dist/* /var/www/html/
-            sudo chown -R www-data:www-data /var/www/html
-            sudo systemctl reload nginx
+    # ===== FRONTEND =====
+    - name: Log in to ECR (FE)
+      run: aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_FE_REPO
 
-      - name: Deploy BE to Dev via FE Proxy
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_FE_DEV_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            chmod 400 "ap-ec2.pem"
+    - name: Build and push FE Docker image
+      run: |
+        docker build -t frontend ./frontend
+        docker tag frontend:latest $ECR_FE_REPO:latest
+        docker push $ECR_FE_REPO:latest
 
-            ssh -i "ap-ec2.pem" ubuntu@${{ secrets.EC2_BE_PRIVATE_IP }} << 'EOF'
-              cd /home/ubuntu/react-express/backend
-              git pull origin dev
-              npm install
-              
-              # Kill existing processes
-              pkill -f "node server.js" || true
-              pkill -f "npm start" || true
-              fuser -k 8080/tcp || true
-              
-              # Wait for processes to die
-              sleep 2
-              
-              # Start in background and detach from terminal
-              nohup npm start > server.log 2>&1 &
-              
-              # Wait a moment and verify it started
-              sleep 3
-              if pgrep -f "node server.js" > /dev/null; then
-                echo "Server started successfully"
-                exit 0
-              else
-                echo "Failed to start server"
-                exit 1
-              fi
-            EOF
+    - name: Deploy to EC2 (FE)
+      run: |
+        echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ec2_key.pem
+        chmod 400 ec2_key.pem
+        ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_FE_REPO
+          docker pull $ECR_FE_REPO:latest
+          docker stop fe_app || true && docker rm fe_app || true
+          docker run -d --name fe_app -p 80:3000 $ECR_FE_REPO:latest
+        EOF
 
-  deploy-prod:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+    # ===== BACKEND =====
+    - name: Log in to ECR (BE)
+      run: aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_BE_REPO
 
-      - name: Get tag name
-        id: tag
-        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+    - name: Build and push BE Docker image
+      run: |
+        docker build -t backend ./backend
+        docker tag backend:latest $ECR_BE_REPO:latest
+        docker push $ECR_BE_REPO:latest
 
-      - name: Deploy FE to Prod
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_FE_PROD_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            cd /home/ubuntu/react-express/frontend
-            git fetch --tags origin
-            git checkout ${{ steps.tag.outputs.tag }}
-            npm install
-            npm run build
-
-            sudo rm -rf /var/www/html/*
-            sudo cp -r dist/* /var/www/html/
-            sudo chown -R www-data:www-data /var/www/html
-            sudo systemctl reload nginx
-
-      - name: Deploy BE to Prod via FE Proxy
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_FE_PROD_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            chmod 400 "ap-ec2.pem"  # Assuming different key for prod
-
-            ssh -i "ap-ec2.pem" ubuntu@${{ secrets.EC2_BE_PROD_PRIVATE_IP }} << 'EOF'
-              cd /home/ubuntu/react-express/backend
-              git fetch --tags origin
-              git checkout ${{ steps.tag.outputs.tag }}
-              npm install
-              
-              # Kill existing processes
-              pkill -f "node server.js" || true
-              pkill -f "npm start" || true
-              fuser -k 8080/tcp || true
-              
-              # Wait for processes to die
-              sleep 2
-              
-              # Start in background and detach from terminal
-              nohup npm start > server.log 2>&1 &
-              
-              # Wait a moment and verify it started
-              sleep 3
-              if pgrep -f "node server.js" > /dev/null; then
-                echo "Production server started successfully"
-                exit 0
-              else
-                echo "Failed to start production server"
-                exit 1
-              fi
-            EOF
-
-  notify-deployment:
-    needs: [deploy-dev, deploy-prod]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify Deployment Status
-        run: |
-          if [[ "${{ needs.deploy-dev.result }}" == "success" ]]; then
-            echo "✅ Dev deployment successful"
-          elif [[ "${{ needs.deploy-dev.result }}" == "failure" ]]; then
-            echo "❌ Dev deployment failed"
-          fi
-          
-          if [[ "${{ needs.deploy-prod.result }}" == "success" ]]; then
-            echo "✅ Prod deployment successful"
-          elif [[ "${{ needs.deploy-prod.result }}" == "failure" ]]; then
-            echo "❌ Prod deployment failed"
-          fi
+    - name: Deploy to EC2 (BE)
+      run: |
+        echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ec2_key.pem
+        chmod 400 ec2_key.pem
+        ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_BE_HOST }} << 'EOF'
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_BE_REPO
+          docker pull $ECR_BE_REPO:latest
+          docker stop be_app || true && docker rm be_app || true
+          docker run -d --name be_app -p 3000:3000 $ECR_BE_REPO:latest
+        EOF
