@@ -35,16 +35,18 @@ jobs:
         docker tag backend:latest $ECR_BE_REPO:backend-latest
         docker push $ECR_BE_REPO:backend-latest
 
+    - name: Setup SSH key
+      run: |
+        echo "${{ secrets.EC2_KEY }}" > key.pem
+        chmod 400 key.pem
+
     - name: Deploy to EC2 (BE)
       run: |
-        echo "${{ secrets.EC2_KEY }}" | base64 -d > ec2_key.pem
-        chmod 400 ec2_key.pem
-        
         # Copy the key to the bastion host (FE EC2) for accessing BE EC2
-        scp -o StrictHostKeyChecking=no -i ec2_key.pem ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }}:~/be_key.pem
+        scp -o StrictHostKeyChecking=no -i key.pem key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }}:~/be_key.pem
         
         # SSH to FE EC2 (bastion) and then SSH to BE EC2 to deploy
-        ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
           chmod 400 ~/be_key.pem
           ssh -o StrictHostKeyChecking=no -i ~/be_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_BE_HOST }} << 'INNER_EOF'
             aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_BE_REPO }}
@@ -67,9 +69,7 @@ jobs:
 
     - name: Deploy to EC2 (FE)
       run: |
-        echo "${{ secrets.EC2_KEY }}" | base64 -d > ec2_key.pem
-        chmod 400 ec2_key.pem
-        ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_FE_REPO }}
           docker pull ${{ env.ECR_FE_REPO }}:frontend-latest
           docker stop fe_app || true && docker rm fe_app || true
