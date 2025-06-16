@@ -70,11 +70,43 @@ jobs:
     - name: Deploy to EC2 (FE)
       run: |
         ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
+          # Install AWS CLI if not present (Ubuntu optimized)
+          if ! command -v aws &> /dev/null; then
+            echo "Installing AWS CLI on Ubuntu..."
+            sudo apt-get update -y
+            sudo apt-get install -y curl unzip
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install
+            rm -rf awscliv2.zip aws/
+            echo "AWS CLI installed successfully"
+          else
+            echo "AWS CLI already installed"
+          fi
+          
+          # Configure AWS credentials
+          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          export AWS_DEFAULT_REGION=${{ env.AWS_REGION }}
+          
+          # Verify AWS CLI installation
+          aws --version
+          
+          # Login to ECR and deploy
+          echo "Logging into ECR..."
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_FE_REPO }}
+          
+          echo "Pulling frontend image..."
           docker pull ${{ env.ECR_FE_REPO }}:frontend-latest
+          
+          echo "Stopping existing container..."
           docker stop fe_app || true && docker rm fe_app || true
+          
+          echo "Starting new frontend container..."
           docker run -d --name fe_app -p 80:80 \
             -e BACKEND_HOST=${{ secrets.EC2_BE_HOST }} \
             -e BACKEND_PORT=3000 \
             ${{ env.ECR_FE_REPO }}:frontend-latest
+          
+          echo "Frontend deployment completed successfully"
         EOF
