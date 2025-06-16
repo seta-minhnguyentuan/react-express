@@ -79,7 +79,7 @@ jobs:
           echo "Starting new frontend container..."
           docker run -d --name fe_app -p 80:80 \
             -e BACKEND_HOST=${{ secrets.EC2_BE_HOST }} \
-            -e BACKEND_PORT=3000 \
+            -e BACKEND_PORT=8080 \
             ${{ env.ECR_FE_REPO }}:frontend-latest
           
           echo "Frontend deployment completed successfully"
