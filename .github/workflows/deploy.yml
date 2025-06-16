@@ -35,16 +35,16 @@ jobs:
         docker tag frontend:latest $ECR_FE_REPO:frontend-latest
         docker push $ECR_FE_REPO:frontend-latest
 
-    - name: Deploy to EC2 (FE)
-      run: |
-        echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ec2_key.pem
-        chmod 400 ec2_key.pem
-        ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_FE_REPO }}
-          docker pull ${{ env.ECR_FE_REPO }}:frontend-latest
-          docker stop fe_app || true && docker rm fe_app || true
-          docker run -d --name fe_app -p 80:3000 ${{ env.ECR_FE_REPO }}:frontend-latest
-        EOF
+    # - name: Deploy to EC2 (FE)
+    #   run: |
+    #     echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ec2_key.pem
+    #     chmod 400 ec2_key.pem
+    #     ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
+    #       aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_FE_REPO }}
+    #       docker pull ${{ env.ECR_FE_REPO }}:frontend-latest
+    #       docker stop fe_app || true && docker rm fe_app || true
+    #       docker run -d --name fe_app -p 80:3000 ${{ env.ECR_FE_REPO }}:frontend-latest
+    #     EOF
 
     # ===== BACKEND =====
     - name: Log in to ECR (BE)
@@ -56,13 +56,13 @@ jobs:
         docker tag backend:latest $ECR_BE_REPO:backend-latest
         docker push $ECR_BE_REPO:backend-latest
 
-    - name: Deploy to EC2 (BE)
-      run: |
-        echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ec2_key.pem
-        chmod 400 ec2_key.pem
-        ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_BE_HOST }} << 'EOF'
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_BE_REPO }}
-          docker pull ${{ env.ECR_BE_REPO }}:backend-latest
-          docker stop be_app || true && docker rm be_app || true
-          docker run -d --name be_app -p 3000:3000 ${{ env.ECR_BE_REPO }}:backend-latest
-        EOF
+    # - name: Deploy to EC2 (BE)
+    #   run: |
+    #     echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ec2_key.pem
+    #     chmod 400 ec2_key.pem
+    #     ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_BE_HOST }} << 'EOF'
+    #       aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_BE_REPO }}
+    #       docker pull ${{ env.ECR_BE_REPO }}:backend-latest
+    #       docker stop be_app || true && docker rm be_app || true
+    #       docker run -d --name be_app -p 3000:3000 ${{ env.ECR_BE_REPO }}:backend-latest
+    #     EOF
