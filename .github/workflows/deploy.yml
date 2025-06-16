@@ -52,7 +52,7 @@ jobs:
             aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_BE_REPO }}
             docker pull ${{ env.ECR_BE_REPO }}:backend-latest
             docker stop backend || true && docker rm backend || true
-            docker run -d --name backend -p 3000:8080 ${{ env.ECR_BE_REPO }}:backend-latest
+            docker run -d --name backend -p 8080:8080 ${{ env.ECR_BE_REPO }}:backend-latest
         INNER_EOF
           rm ~/be_key.pem
         EOF
