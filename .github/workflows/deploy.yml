@@ -70,6 +70,7 @@ jobs:
     - name: Deploy to EC2 (FE)
       run: |
         ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_FE_REPO }}
           echo "Pulling frontend image..."
           docker pull ${{ env.ECR_FE_REPO }}:frontend-latest
           
