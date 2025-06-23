@@ -26,9 +26,6 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
 
     # ===== BACKEND =====
-    - name: Log in to ECR (BE)
-      run: aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_BE_REPO
-
     - name: Build and push BE Docker image
       run: |
         docker build -t backend ./backend
@@ -49,7 +46,6 @@ jobs:
         ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FE_HOST }} << 'EOF'
           chmod 400 ~/be_key.pem
           ssh -o StrictHostKeyChecking=no -i ~/be_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_BE_HOST }} << 'INNER_EOF'
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_BE_REPO }}
             docker pull ${{ env.ECR_BE_REPO }}:backend-latest
             docker stop backend || true && docker rm backend || true
             docker run -d --name backend -p 8080:8080 ${{ env.ECR_BE_REPO }}:backend-latest
@@ -58,9 +54,6 @@ jobs:
         EOF
 
     # ===== FRONTEND =====
-    - name: Log in to ECR (FE)
-      run: aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_FE_REPO
-
     - name: Build and push FE Docker image
       run: |
         docker build -t frontend ./frontend
